@@ -372,33 +372,38 @@ router.get('/dashboard', async (req, res) => {
       jobsCompletedToday,
       recentJobs,
       activeEncodersCount,
-      lastCompletedJobs
+      lastCompletedJobs,
+      gatewayHealthStatus
     ] = await Promise.all([
       mongodb.getAvailableJobs(),
       mongodb.getActiveJobs(),
       mongodb.getJobsCompletedToday(),
       mongodb.getRecentJobs(),
       mongodb.getActiveEncodersCount(),
-      mongodb.getLastCompletedJobs(10)
+      mongodb.getLastCompletedJobs(10),
+      getGatewayMonitor().getDetailedHealthStatus().catch(() => ({ isOnline: false }))
     ]);
 
-    // Calculate Gateway Health based on last 10 completed jobs
+    // Calculate Gateway Health
     let gatewayHealth: 'healthy' | 'faulty' | 'dead' = 'healthy';
     
-    if (lastCompletedJobs.length === 0) {
-      // No completed jobs data - cannot determine, assume dead
+    // First check: Is gateway API responding?
+    if (!gatewayHealthStatus.isOnline) {
       gatewayHealth = 'dead';
-    } else {
-      // Check if any of the last 10 jobs have "Force processed" message
-      const forcedJobs = lastCompletedJobs.filter(job => 
-        job.result?.message?.includes('Force processed')
-      );
+    } 
+    // Second check: If responding, check last completed job
+    else if (lastCompletedJobs.length > 0) {
+      const mostRecentJob = lastCompletedJobs[0];
       
-      if (forcedJobs.length > 0) {
+      if (mostRecentJob.result?.message?.includes('Force processed')) {
         gatewayHealth = 'faulty';
       } else {
         gatewayHealth = 'healthy';
       }
+    }
+    // If gateway is online but no completed jobs exist, assume healthy
+    else {
+      gatewayHealth = 'healthy';
     }
 
     // Helper function to format relative time
