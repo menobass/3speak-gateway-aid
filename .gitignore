@@ -113,3 +113,4 @@ docker-compose.override.yml
 
 # Deployment docs with sensitive info
 docs/DEPLOYMENT_PRODUCTION.md
+docs/GATEWAY_AID_FALLBACK_SYSTEM.md
